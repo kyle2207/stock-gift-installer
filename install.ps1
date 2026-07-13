@@ -1,14 +1,17 @@
 # =============================================================================
-# stock-gift bootstrap installer (Windows)
+# stock-gift bootstrap installer (Windows) - compiled-lib edition
 #
 #   irm https://raw.githubusercontent.com/kyle2207/stock-gift-installer/main/install.ps1 | iex
 #
-#   1. Ensure Python (>=3.10) and Git (auto-install via winget if missing)
-#   2. Clone source repo to %LOCALAPPDATA%\stock-gift\app (git pull if exists;
-#      GitHub sign-in prompted once)
-#   3. Create venv, install deps (requirements + installers\*.whl) + editable app
-#   4. Create the stock-gift command (user PATH, no admin needed)
-#   5. Run "stock-gift doctor" health check
+# What it does (no Git, no GitHub account, no manual downloads):
+#   1. Ensure Python 3.12 (auto-install via winget if missing)
+#   2. Download the compiled core wheel from this repo's latest GitHub Release
+#   3. Download broker SDK wheels from the brokers' OFFICIAL sites
+#      (E.SUN esun_trade/esun_marketdata 2.2.0, Fubon fubon_neo 2.0.1)
+#   4. Create venv, pip install everything (deps come from PyPI)
+#   5. Create the stock-gift command (user PATH); user data lives in
+#      %LOCALAPPDATA%\stock-gift\home (config auto-generated; put certificates there)
+#   6. Run "stock-gift doctor"
 #
 # Commands: stock-gift / stock-gift doctor / stock-gift update / stock-gift uninstall
 # NOTE: keep this file pure ASCII (works with irm|iex and PS 5.1 without BOM).
@@ -16,125 +19,138 @@
 
 $ErrorActionPreference = 'Stop'
 
-$Root = Join-Path $env:LOCALAPPDATA 'stock-gift'
-$App  = Join-Path $Root 'app'
-$Venv = Join-Path $Root 'venv'
-$Bin  = Join-Path $Root 'bin'
-$Repo = 'kyle2207/StockTool'
+$Root   = Join-Path $env:LOCALAPPDATA 'stock-gift'
+$Home2  = Join-Path $Root 'home'
+$Venv   = Join-Path $Root 'venv'
+$Bin    = Join-Path $Root 'bin'
+$Wheels = Join-Path $Root 'wheels'
+$RepoApi = 'https://api.github.com/repos/kyle2207/stock-gift-installer'
+
+# Broker SDK official download sources (exact known-good versions)
+$SdkUrls = @(
+    @{ Name = 'esun_trade-2.2.0-cp37-abi3-win_amd64.whl';
+       Url  = 'https://www.esunsec.com.tw/trading-platforms/api-trading/binary-packages/esun_trade-2.2.0-cp37-abi3-win_amd64.whl' },
+    @{ Name = 'esun_marketdata-2.2.0-cp37-abi3-win_amd64.whl';
+       Url  = 'https://www.esunsec.com.tw/trading-platforms/api-trading/binary-packages/esun_marketdata-2.2.0-cp37-abi3-win_amd64.whl' },
+    @{ Name = 'fubon_neo-2.0.1-cp37-abi3-win_amd64.zip';  # zip contains the whl
+       Url  = 'https://www.fbs.com.tw/TradeAPI_SDK/fubon_binary/fubon_neo-2.0.1-cp37-abi3-win_amd64.zip' }
+)
 
 function Step($msg) { Write-Host "==> $msg" -ForegroundColor Cyan }
 function Fail($msg) { Write-Host "[ERROR] $msg" -ForegroundColor Red; exit 1 }
 
-# --- 0. dirs -----------------------------------------------------------------
-Step "Install location: $Root"
-New-Item -ItemType Directory -Force -Path $Root, $Bin | Out-Null
+Step "Install location: $Root  (user data: home\)"
+New-Item -ItemType Directory -Force -Path $Root, $Bin, $Wheels, $Home2 | Out-Null
 
 function Refresh-Path {
     $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' +
                 [Environment]::GetEnvironmentVariable('Path','User')
 }
 
-# --- 1. Python ---------------------------------------------------------------
-Step "Checking Python (>= 3.10)"
-$py = $null
-foreach ($cand in @('python', 'py')) {
-    if (Get-Command $cand -ErrorAction SilentlyContinue) {
-        try {
-            $v = & $cand -c "import sys; print('%d.%d' % sys.version_info[:2])" 2>$null
-            if ($v -and ([version]$v -ge [version]'3.10')) { $py = $cand; break }
-        } catch {}
+# --- 0. migrate from old clone-based layout ------------------------------------
+$OldApp = Join-Path $Root 'app'
+if (Test-Path $OldApp) {
+    Step "Old layout detected - migrating config/certificates to home\"
+    foreach ($item in @('config','certificates')) {
+        $src = Join-Path $OldApp $item
+        $dst = Join-Path $Home2 $item
+        if ((Test-Path $src) -and -not (Test-Path $dst)) {
+            Move-Item $src $dst
+            Write-Host "    moved $item -> home\$item"
+        }
     }
+    Remove-Item -Recurse -Force $OldApp
+    if (Test-Path $Venv) { Remove-Item -Recurse -Force $Venv }  # old editable venv is stale
+    Write-Host "    old app/venv removed (clean rebuild)"
+}
+
+# --- 1. Python 3.12 (wheel is cp312) --------------------------------------------
+Step "Checking Python 3.12 (required: compiled core targets cp312)"
+$py = $null
+if (Get-Command py -ErrorAction SilentlyContinue) {
+    try { & py -3.12 -c "pass" 2>$null; if ($LASTEXITCODE -eq 0) { $py = 'py -3.12' } } catch {}
+}
+if (-not $py -and (Get-Command python -ErrorAction SilentlyContinue)) {
+    try {
+        $v = & python -c "import sys; print('%d.%d' % sys.version_info[:2])" 2>$null
+        if ($v -eq '3.12') { $py = 'python' }
+    } catch {}
 }
 if (-not $py) {
-    Step "Python >= 3.10 not found, installing via winget..."
+    Step "Python 3.12 not found, installing via winget..."
     winget install -e --id Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements
     Refresh-Path
-    $py = 'python'
+    $py = 'py -3.12'
 }
-Write-Host "    Python: $(& $py --version)"
+Write-Host "    Python: $(Invoke-Expression "$py --version")"
 
-# --- 2. Git ------------------------------------------------------------------
-Step "Checking Git"
-if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-    Step "Git not found, installing via winget..."
-    winget install -e --id Git.Git --silent --accept-package-agreements --accept-source-agreements
-    Refresh-Path
-}
-Write-Host "    $(git --version)"
-
-# --- 3. clone / update source ------------------------------------------------
-if (Test-Path (Join-Path $App '.git')) {
-    Step "Existing install found, updating (git pull)"
-    git -C $App pull --ff-only
+# --- 2. core wheel from latest GitHub Release -----------------------------------
+Step "Fetching latest release info"
+$rel = Invoke-RestMethod "$RepoApi/releases/latest" -Headers @{ 'User-Agent' = 'stock-gift-installer' }
+$asset = $rel.assets | Where-Object { $_.name -like 'stock_gift-*.whl' } | Select-Object -First 1
+if (-not $asset) { Fail "no stock_gift wheel asset in latest release ($($rel.tag_name))" }
+$CoreWhl = Join-Path $Wheels $asset.name
+if (-not (Test-Path $CoreWhl)) {
+    Step "Downloading core: $($asset.name) ($([math]::Round($asset.size/1kb)) KB)"
+    Invoke-WebRequest $asset.browser_download_url -OutFile $CoreWhl -UseBasicParsing
 } else {
-    Step "Cloning source repo (a GitHub sign-in window may pop up once)"
-    $cloned = $false
-    if (Get-Command gh -ErrorAction SilentlyContinue) {
-        gh auth status 2>$null | Out-Null
-        if ($LASTEXITCODE -eq 0) {
-            gh repo clone $Repo $App
-            if ($LASTEXITCODE -eq 0) { $cloned = $true }
-        }
-    }
-    if (-not $cloned) {
-        git clone "https://github.com/$Repo.git" $App
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host ""
-            Write-Host "Clone failed (GitHub auth needed). Pick one, then re-run this script:" -ForegroundColor Yellow
-            Write-Host "  A) winget install GitHub.cli ; gh auth login"
-            Write-Host "  B) create a read-only PAT on GitHub, then:"
-            Write-Host "     git clone https://<PAT>@github.com/$Repo.git `"$App`""
-            exit 1
-        }
-    }
-}
-if (-not (Test-Path (Join-Path $App 'pyproject.toml'))) {
-    Fail "pyproject.toml not found in repo - the source repo is not up to date yet."
+    Write-Host "    core cached: $($asset.name)"
 }
 
-# --- 4. venv + deps ------------------------------------------------------------
+# --- 3. broker SDKs from official sites ------------------------------------------
+Step "Downloading broker SDKs from official sites (cached if present)"
+foreach ($sdk in $SdkUrls) {
+    $dst = Join-Path $Wheels $sdk.Name
+    if (-not (Test-Path $dst)) {
+        Write-Host "    downloading $($sdk.Name) ..."
+        Invoke-WebRequest $sdk.Url -OutFile $dst -UseBasicParsing
+    } else {
+        Write-Host "    cached: $($sdk.Name)"
+    }
+    if ($sdk.Name -like '*.zip') {
+        Expand-Archive -Path $dst -DestinationPath $Wheels -Force
+    }
+}
+$SdkWhls = Get-ChildItem (Join-Path $Wheels '*.whl') | Where-Object { $_.Name -notlike 'stock_gift-*' }
+if ($SdkWhls.Count -lt 3) { Fail "expected 3 broker SDK wheels, found $($SdkWhls.Count)" }
+
+# --- 4. venv + install ------------------------------------------------------------
 $VenvPy = Join-Path $Venv 'Scripts\python.exe'
 if (-not (Test-Path $VenvPy)) {
-    Step "Creating virtualenv"
-    & $py -m venv $Venv
+    Step "Creating virtualenv (Python 3.12)"
+    Invoke-Expression "$py -m venv `"$Venv`""
 }
-Step "Installing dependencies (requirements + wheels + app)"
+Step "Installing core + broker SDKs (deps auto-resolved from PyPI)"
 & $VenvPy -m pip install --upgrade pip --quiet
-& $VenvPy -m pip install -r (Join-Path $App 'requirements.txt') --quiet
-Get-ChildItem (Join-Path $App 'installers\*.whl') | ForEach-Object {
-    & $VenvPy -m pip install $_.FullName --quiet
-}
-& $VenvPy -m pip install -e $App --quiet
+foreach ($w in $SdkWhls) { & $VenvPy -m pip install $w.FullName --quiet }
+& $VenvPy -m pip install $CoreWhl --force-reinstall --upgrade --quiet
 if (-not (Test-Path (Join-Path $Venv 'Scripts\stock-gift.exe'))) {
-    Fail "stock-gift entry point was not created - pip install -e failed, see errors above."
+    Fail "stock-gift entry point was not created - pip install failed, see errors above."
 }
 
-# --- 5. command shim + PATH ----------------------------------------------------
+# --- 5. command shim + PATH --------------------------------------------------------
 Step "Creating the stock-gift command"
 $shim = @'
 @echo off
 setlocal
 set "ROOT=%LOCALAPPDATA%\stock-gift"
+set "STOCK_GIFT_HOME=%ROOT%\home"
 if /I "%~1"=="update" goto :update
 if /I "%~1"=="uninstall" goto :uninstall
-pushd "%ROOT%\app"
+pushd "%STOCK_GIFT_HOME%"
 "%ROOT%\venv\Scripts\stock-gift.exe" %*
 set EC=%ERRORLEVEL%
 popd
 exit /b %EC%
 
 :update
-echo === git pull ===
-git -C "%ROOT%\app" pull --ff-only
-echo === pip sync ===
-"%ROOT%\venv\Scripts\python.exe" -m pip install -r "%ROOT%\app\requirements.txt" --quiet
-"%ROOT%\venv\Scripts\python.exe" -m pip install -e "%ROOT%\app" --quiet
-echo Update done.
-exit /b 0
+echo Re-running installer to fetch the latest release...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/kyle2207/stock-gift-installer/main/install.ps1 | iex"
+exit /b %ERRORLEVEL%
 
 :uninstall
 echo This removes the whole folder: %ROOT%
-echo NOTE: app\config\config.ini and app\certificates\ are deleted too - back them up first!
+echo NOTE: home\config\config.ini and home\certificates\ are deleted too - back them up first!
 set /p CONFIRM="Remove? (y/n): "
 if /I not "%CONFIRM%"=="y" (
   echo Cancelled.
@@ -155,14 +171,12 @@ if (($userPath -split ';') -notcontains $Bin) {
 }
 $env:Path += ";$Bin"
 
-# --- 6. first-run guidance + doctor --------------------------------------------
-# config.ini is auto-generated on first run (public data mode, no secrets needed).
-# The only manual step: put your broker certificates under app\certificates\.
+# --- 6. first-run guidance + doctor -------------------------------------------------
 Write-Host ""
-if (-not (Test-Path (Join-Path $App 'certificates\esun')) -and
-    -not (Test-Path (Join-Path $App 'certificates\fubon'))) {
+if (-not (Test-Path (Join-Path $Home2 'certificates\esun')) -and
+    -not (Test-Path (Join-Path $Home2 'certificates\fubon'))) {
     Write-Host "[ONE MORE STEP] Put your broker certificates here:" -ForegroundColor Yellow
-    Write-Host "    $App\certificates\<esun|fubon>\<name>\  (SDK config.ini + cert files)"
+    Write-Host "    $Home2\certificates\<esun|fubon>\<name>\  (SDK config.ini + cert files)"
     Write-Host ""
 }
 Step "Running health check (stock-gift doctor)"
@@ -172,5 +186,5 @@ Write-Host ""
 Write-Host "Install finished. Commands:" -ForegroundColor Green
 Write-Host "    stock-gift            # interactive menu"
 Write-Host "    stock-gift doctor     # health check"
-Write-Host "    stock-gift update     # update to latest"
+Write-Host "    stock-gift update     # update to latest release"
 Write-Host "    stock-gift uninstall  # remove everything"
