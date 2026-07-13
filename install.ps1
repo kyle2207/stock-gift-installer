@@ -1,17 +1,15 @@
 ﻿# =============================================================================
-# stock-gift 一行安裝腳本（Windows）
+# stock-gift bootstrap installer (Windows)
 #
 #   irm https://raw.githubusercontent.com/kyle2207/stock-gift-installer/main/install.ps1 | iex
 #
-# 做什麼：
 #   1. 確保 Python(>=3.10) 與 Git（缺則 winget 自動安裝）
-#   2. clone 私有 repo 到 %LOCALAPPDATA%\stock-gift\app（已存在則 git pull）
-#      私有 repo 認證：git 內建 GCM 會自動開瀏覽器 OAuth 一次；或 gh 已登入直接用
-#   3. 建 venv、安裝依賴 + 券商 SDK whl（repo 內 installers/）+ editable 安裝本體
-#   4. 建 stock-gift 指令（加入使用者 PATH，免系統管理員）
-#   5. 跑 stock-gift doctor 健檢，告訴你還缺什麼（config/憑證需手動複製一次）
+#   2. clone 來源 repo 到 %LOCALAPPDATA%\stock-gift\app（已存在則 git pull；需登入一次）
+#   3. 建 venv、安裝依賴（含 installers/ 下的 whl）、editable 安裝本體
+#   4. 建 stock-gift 指令（使用者 PATH，免系統管理員）
+#   5. 跑 stock-gift doctor 健檢
 #
-# 之後：stock-gift（下單）/ stock-gift doctor / stock-gift update / stock-gift uninstall
+# 指令：stock-gift / stock-gift doctor / stock-gift update / stock-gift uninstall
 # =============================================================================
 
 $ErrorActionPreference = 'Stop'
@@ -66,7 +64,7 @@ if (Test-Path (Join-Path $App '.git')) {
     Step "已存在安裝，更新程式碼（git pull）"
     git -C $App pull --ff-only
 } else {
-    Step "Clone 私有 repo（第一次會跳出 GitHub 登入視窗，登入一次即可）"
+    Step "Clone 來源 repo（第一次會跳出 GitHub 登入視窗，登入一次即可）"
     $cloned = $false
     # 優先用 gh（若已登入）
     if (Get-Command gh -ErrorAction SilentlyContinue) {
@@ -81,7 +79,7 @@ if (Test-Path (Join-Path $App '.git')) {
         git clone "https://github.com/$Repo.git" $App
         if ($LASTEXITCODE -ne 0) {
             Write-Host ""
-            Write-Host "Clone 失敗。私有 repo 需要認證，兩個辦法擇一後重跑本腳本：" -ForegroundColor Yellow
+            Write-Host "Clone 失敗（需要 GitHub 認證），兩個辦法擇一後重跑本腳本：" -ForegroundColor Yellow
             Write-Host "  A) winget install GitHub.cli ; gh auth login   （瀏覽器登入）"
             Write-Host "  B) 到 GitHub 產生 read-only PAT，執行："
             Write-Host "     git clone https://<PAT>@github.com/$Repo.git `"$App`""
@@ -96,7 +94,7 @@ if (-not (Test-Path $VenvPy)) {
     Step "建立虛擬環境"
     & $py -m venv $Venv
 }
-Step "安裝依賴（requirements + 券商 SDK whl + 本體）"
+Step "安裝依賴（requirements + whl + 本體）"
 & $VenvPy -m pip install --upgrade pip --quiet
 & $VenvPy -m pip install -r (Join-Path $App 'requirements.txt') --quiet
 Get-ChildItem (Join-Path $App 'installers\*.whl') | ForEach-Object {
@@ -160,7 +158,7 @@ Step "執行環境健檢（stock-gift doctor）"
 
 Write-Host ""
 Write-Host "安裝完成。常用指令：" -ForegroundColor Green
-Write-Host "    stock-gift            # 互動選單下單"
+Write-Host "    stock-gift            # 互動選單"
 Write-Host "    stock-gift doctor     # 環境健檢"
 Write-Host "    stock-gift update     # 更新到最新版"
 Write-Host "    stock-gift uninstall  # 完整移除"
