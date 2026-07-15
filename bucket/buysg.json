@@ -1,0 +1,44 @@
+{
+    "version": "1.2.0",
+    "description": "悠買 (buysg) — 股東會紀念品自動下單 CLI（讀 MOPS、多帳戶零股下單、Excel 報表）",
+    "homepage": "https://yustockgifts.com/download",
+    "license": "Freeware",
+    "notes": [
+        "首次使用：buysg login 登入零股悠帳號 → 放本人券商憑證到 %USERPROFILE%\\scoop\\persist\\buysg\\home\\certificates\\ → buysg doctor 檢查。",
+        "券商 SDK 於安裝時由券商官網自動下載（非由我們提供或轉發）。"
+    ],
+    "url": "https://github.com/kyle2207/buysg-installer/releases/download/v1.2.0/buysg-1.2.0-cp312-cp312-win_amd64.whl",
+    "hash": "21682b937dfc99a13937b59f2a20c8b2dae9983beda199d9c28c6c4a942d8d2a",
+    "pre_install": [
+        "Set-Content \"$dir\\buysg.cmd\" @('@echo off','setlocal',('set \"BUYSG_HOME=' + $persist_dir + '\\home\"'),('\"' + $dir + '\\venv\\Scripts\\buysg.exe\" %*'),'exit /b %ERRORLEVEL%') -Encoding Ascii"
+    ],
+    "post_install": [
+        "$ErrorActionPreference = 'Continue'",
+        "$py = \"$dir\\python\"",
+        "Write-Host 'buysg: 下載 Python 3.12.7（nuget 完整版）...'",
+        "Invoke-WebRequest 'https://api.nuget.org/v3-flatcontainer/python/3.12.7/python.3.12.7.nupkg' -OutFile \"$dir\\py.zip\" -UseBasicParsing -ErrorAction Stop",
+        "if ((Get-FileHash \"$dir\\py.zip\" -Algorithm SHA256).Hash -ne '149DD298E0B7A82250CA019471770FFF079874088A4E8501CA20922D7DF3A6AC') { throw 'python nupkg hash mismatch' }",
+        "Expand-Archive \"$dir\\py.zip\" $py -Force -ErrorAction Stop; Remove-Item \"$dir\\py.zip\"",
+        "Write-Host 'buysg: 建立虛擬環境...'",
+        "& \"$py\\tools\\python.exe\" -m venv \"$dir\\venv\" 2>$null",
+        "$vpy = \"$dir\\venv\\Scripts\\python.exe\"",
+        "& $vpy -m pip install --upgrade pip --quiet 2>$null",
+        "Write-Host 'buysg: 從券商官網下載 SDK（不轉散布）...'",
+        "$wh = \"$dir\\wheels\"; New-Item -ItemType Directory -Force $wh | Out-Null",
+        "foreach ($u in @('https://www.esunsec.com.tw/trading-platforms/api-trading/binary-packages/esun_trade-2.2.0-cp37-abi3-win_amd64.whl','https://www.esunsec.com.tw/trading-platforms/api-trading/binary-packages/esun_marketdata-2.2.0-cp37-abi3-win_amd64.whl','https://www.fbs.com.tw/TradeAPI_SDK/fubon_binary/fubon_neo-2.0.1-cp37-abi3-win_amd64.zip')) { $n = Split-Path $u -Leaf; Invoke-WebRequest $u -OutFile \"$wh\\$n\" -UseBasicParsing -ErrorAction Stop; if ($n -like '*.zip') { Expand-Archive \"$wh\\$n\" $wh -Force -ErrorAction Stop } }",
+        "& $vpy -m pip install (Get-ChildItem \"$wh\\*.whl\" | Where-Object { $_.Name -like 'esun_*' -or $_.Name -like 'fubon_*' }).FullName --quiet 2>$null",
+        "Write-Host 'buysg: 安裝核心...'",
+        "& $vpy -m pip install (Get-ChildItem \"$dir\\buysg-*.whl\").FullName --quiet 2>$null",
+        "if (-not (Test-Path \"$dir\\venv\\Scripts\\buysg.exe\")) { throw 'buysg 進入點未建立，安裝失敗' }",
+        "New-Item -ItemType Directory -Force \"$persist_dir\\home\" | Out-Null",
+        "Write-Host 'buysg 安裝完成。先跑：buysg login 登入零股悠帳號，再 buysg doctor 檢查環境。'"
+    ],
+    "bin": "buysg.cmd",
+    "persist": "home",
+    "checkver": {
+        "github": "https://github.com/kyle2207/buysg-installer"
+    },
+    "autoupdate": {
+        "url": "https://github.com/kyle2207/buysg-installer/releases/download/v$version/buysg-$version-cp312-cp312-win_amd64.whl"
+    }
+}

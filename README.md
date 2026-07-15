@@ -9,28 +9,52 @@ Windows 一行安裝的股票下單 CLI。
 
 ## 安裝
 
+兩種安裝方式擇一，都免系統管理員、免 GitHub 帳號。
+
+### 方式 A：一行安裝（最省事）
+
 開啟 **PowerShell**，貼上一行：
 
 ```powershell
 irm https://raw.githubusercontent.com/kyle2207/buysg-installer/main/install.ps1 | iex
 ```
 
-安裝器會自動完成（全程不需要 GitHub 帳號、不需要 Git）：
+### 方式 B：用 Scoop 套件管理器（更新 / 移除更乾淨）
 
-1. 檢查 / 自動安裝 Python 3.12
+若你已用或想用 [Scoop](https://scoop.sh)（Windows 套件管理器，安裝含雜湊驗證、更新省心）：
+
+```powershell
+# 一次性：安裝 Scoop
+irm get.scoop.sh | iex
+# 加入本 bucket 並安裝
+scoop bucket add buysg https://github.com/kyle2207/buysg-installer
+scoop install buysg
+```
+
+之後：`scoop update buysg`（更新）、`scoop uninstall buysg`（移除；憑證/設定保留在
+`scoop\persist\buysg\`，除非加 `--purge`）。
+
+---
+
+不論哪種方式，安裝時都會自動完成（全程不需要 GitHub 帳號、不需要 Git）：
+
+1. 準備 Python 3.12（一行安裝走 winget；Scoop 版自帶 nuget 完整版 Python，不污染系統）
 2. 從本 repo 的 Releases 下載程式核心
-3. 從**券商官方網站**下載交易 SDK（玉山 esun_trade / esun_marketdata、富邦 fubon_neo）
+3. 從**券商官方網站**下載交易 SDK（玉山 esun_trade / esun_marketdata、富邦 fubon_neo，非由我們提供或轉發）
 4. 建立獨立執行環境與 `buysg` 指令（加入使用者 PATH，不需系統管理員）
-5. 執行 `buysg doctor` 環境健檢
+5. 首次使用：`buysg login` 登入零股悠帳號 → 放入券商憑證 → `buysg doctor` 健檢
 
 > 安裝當下的視窗可直接使用 `buysg`；其他已開啟的視窗需重開才會認得指令。
 
 ## 安裝後的唯一手動步驟：放入你本人的券商憑證
 
-把你**本人**的券商憑證資料夾放到：
+把你**本人**的券商憑證資料夾放到 `home\certificates\`（一行安裝與 Scoop 的 `home` 位置不同）：
+
+- **一行安裝**：`%LOCALAPPDATA%\buysg\home\certificates\`
+- **Scoop 安裝**：`%USERPROFILE%\scoop\persist\buysg\home\certificates\`
 
 ```
-%LOCALAPPDATA%\buysg\home\certificates\
+<home>\certificates\
 └── <esun 或 fubon>\
     └── <自訂名稱>\            ← 一個資料夾 = 一個帳戶（會自動掃描）
         ├── config.ini          ← 該券商 SDK 的設定檔
