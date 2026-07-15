@@ -1,5 +1,5 @@
 {
-    "version": "1.2.0",
+    "version": "1.3.0",
     "description": "悠買 (buysg) — 股東會紀念品自動下單 CLI（讀 MOPS、多帳戶零股下單、Excel 報表）",
     "homepage": "https://yustockgifts.com/download",
     "license": "Freeware",
@@ -7,8 +7,8 @@
         "首次使用：buysg login 登入零股悠帳號 → 放本人券商憑證到 %USERPROFILE%\\scoop\\persist\\buysg\\home\\certificates\\ → buysg doctor 檢查。",
         "券商 SDK 於安裝時由券商官網自動下載（非由我們提供或轉發）。"
     ],
-    "url": "https://github.com/kyle2207/buysg-installer/releases/download/v1.2.0/buysg-1.2.0-cp312-cp312-win_amd64.whl",
-    "hash": "21682b937dfc99a13937b59f2a20c8b2dae9983beda199d9c28c6c4a942d8d2a",
+    "url": "https://github.com/kyle2207/buysg-installer/releases/download/v1.3.0/buysg-1.3.0-cp312-cp312-win_amd64.whl",
+    "hash": "0505a9589973dea537889c70e0d6044f7ebce1ae29a5c7d5c0b86e38cbbdc099",
     "pre_install": [
         "Set-Content \"$dir\\buysg.cmd\" @('@echo off','setlocal',('set \"BUYSG_HOME=' + $persist_dir + '\\home\"'),('\"' + $dir + '\\venv\\Scripts\\buysg.exe\" %*'),'exit /b %ERRORLEVEL%') -Encoding Ascii"
     ],
