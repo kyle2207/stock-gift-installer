@@ -1,0 +1,21 @@
+# 自動維護 Scoop manifest（bucket/buysg.json）：每 4 小時偵測本 repo 的新 Release，
+# 自動更新 manifest 的 version + hash 並 commit。發新版 wheel 後零手動維護。
+name: Excavator
+on:
+  schedule:
+    - cron: '20 */4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  excavate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Excavate
+        uses: ScoopInstaller/GithubActions@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SKIP_UPDATED: 1

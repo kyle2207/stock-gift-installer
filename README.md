@@ -9,36 +9,15 @@ Windows 一行安裝的股票下單 CLI。
 
 ## 安裝
 
-兩種安裝方式擇一，都免系統管理員、免 GitHub 帳號。
-
-### 方式 A：一行安裝（最省事）
-
 開啟 **PowerShell**，貼上一行：
 
 ```powershell
 irm https://raw.githubusercontent.com/kyle2207/buysg-installer/main/install.ps1 | iex
 ```
 
-### 方式 B：用 Scoop 套件管理器（更新 / 移除更乾淨）
+安裝器會自動完成（全程不需要 GitHub 帳號、不需要 Git）：
 
-若你已用或想用 [Scoop](https://scoop.sh)（Windows 套件管理器，安裝含雜湊驗證、更新省心）：
-
-```powershell
-# 一次性：安裝 Scoop
-irm get.scoop.sh | iex
-# 加入本 bucket 並安裝
-scoop bucket add buysg https://github.com/kyle2207/buysg-installer
-scoop install buysg
-```
-
-之後：`scoop update buysg`（更新）、`scoop uninstall buysg`（移除；憑證/設定保留在
-`scoop\persist\buysg\`，除非加 `--purge`）。
-
----
-
-不論哪種方式，安裝時都會自動完成（全程不需要 GitHub 帳號、不需要 Git）：
-
-1. 準備 Python 3.12（一行安裝走 winget；Scoop 版自帶 nuget 完整版 Python，不污染系統）
+1. 檢查 / 自動安裝 Python 3.12
 2. 從本 repo 的 Releases 下載程式核心
 3. 從**券商官方網站**下載交易 SDK（玉山 esun_trade / esun_marketdata、富邦 fubon_neo，非由我們提供或轉發）
 4. 建立獨立執行環境與 `buysg` 指令（加入使用者 PATH，不需系統管理員）
@@ -48,13 +27,10 @@ scoop install buysg
 
 ## 安裝後的唯一手動步驟：放入你本人的券商憑證
 
-把你**本人**的券商憑證資料夾放到 `home\certificates\`（一行安裝與 Scoop 的 `home` 位置不同）：
-
-- **一行安裝**：`%LOCALAPPDATA%\buysg\home\certificates\`
-- **Scoop 安裝**：`%USERPROFILE%\scoop\persist\buysg\home\certificates\`
+把你**本人**的券商憑證資料夾放到：
 
 ```
-<home>\certificates\
+%LOCALAPPDATA%\buysg\home\certificates\
 └── <esun 或 fubon>\
     └── <自訂名稱>\            ← 一個資料夾 = 一個帳戶（會自動掃描）
         ├── config.ini          ← 該券商 SDK 的設定檔
@@ -124,3 +100,19 @@ scoop install buysg
 - 任何問題先跑 `buysg doctor`，它會逐項標出缺什麼、該放哪
 - 新開的視窗找不到 `buysg` 指令 → 重開一個 PowerShell 視窗
 - 想砍掉重來：`buysg uninstall` 後重跑安裝一行（憑證記得先備份）
+
+---
+
+<details>
+<summary>進階：用 Scoop 安裝（給熟悉套件管理器的使用者）</summary>
+
+若你已用 [Scoop](https://scoop.sh)：
+
+```powershell
+scoop bucket add buysg https://github.com/kyle2207/buysg-installer
+scoop install buysg
+```
+
+之後 `scoop update buysg` / `scoop uninstall buysg`（憑證/設定保留在
+`%USERPROFILE%\scoop\persist\buysg\home\`，除非加 `--purge`）。功能與一行安裝相同。
+</details>
