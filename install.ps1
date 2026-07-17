@@ -13,7 +13,7 @@
 #      %LOCALAPPDATA%\buysg\home (config auto-generated; put certificates there)
 #   6. Run "buysg doctor"
 #
-# Commands: buysg / buysg doctor / buysg update / buysg uninstall
+# Commands: buysg / login / preview / balance / cancel / accounts / doctor / update / uninstall / help
 # NOTE: keep this file pure ASCII (works with irm|iex and PS 5.1 without BOM).
 # =============================================================================
 
@@ -246,6 +246,7 @@ Step "Running health check (buysg doctor)"
 Write-Host ""
 Write-Host "Install finished. Commands:" -ForegroundColor Green
 Write-Host "    buysg            # interactive order menu"
+Write-Host "    buysg login      # sign in / register (Google or Facebook)"
 Write-Host "    buysg preview    # view current gift list (no broker login)"
 Write-Host "    buysg balance    # account balance + upcoming settlements"
 Write-Host "    buysg cancel     # cancel pending orders (pick by stock code)"
