@@ -1,13 +1,15 @@
 # buysg
 
-Windows 一行安裝的股票下單 CLI。
+一行安裝的股票下單 CLI —— Windows / macOS / Linux。
 
 ## 系統需求
 
-- Windows 10 / 11（64 位元）
+- 以下任一 64 位元系統：**Windows 10 / 11**、**macOS（Apple 晶片 / arm64）**、**Linux（x86_64）**
 - 網路連線（安裝器會自動處理其餘所有前置需求，包含 Python）
 
 ## 安裝
+
+### Windows
 
 開啟 **PowerShell**，貼上一行：
 
@@ -15,9 +17,17 @@ Windows 一行安裝的股票下單 CLI。
 irm https://raw.githubusercontent.com/kyle2207/buysg-installer/main/install.ps1 | iex
 ```
 
+### macOS / Linux
+
+開啟**終端機（Terminal）**，貼上一行：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kyle2207/buysg-installer/main/install.sh | bash
+```
+
 安裝器會自動完成（全程不需要 GitHub 帳號、不需要 Git）：
 
-1. 檢查 / 自動安裝 Python 3.12
+1. 檢查 / 自動安裝 Python 3.12（Windows 用 winget、macOS 用 Homebrew、Linux 用 apt / dnf / pyenv）
 2. 從本 repo 的 Releases 下載程式核心
 3. 從**券商官方網站**下載交易 SDK（玉山 esun_trade / esun_marketdata、富邦 fubon_neo，非由我們提供或轉發）
 4. 建立獨立執行環境與 `buysg` 指令（加入使用者 PATH，不需系統管理員）
@@ -60,7 +70,7 @@ irm https://raw.githubusercontent.com/kyle2207/buysg-installer/main/install.ps1 
 ## 隱私與帳密安全
 
 券商帳密與憑證**只存在你的電腦**、只用於呼叫券商**官方 SDK** 登入，
-驗證後自動以 Windows DPAPI 加密，**不會上傳到任何地方**。
+驗證後自動加密保護（Windows 用 DPAPI、macOS / Linux 用系統鑰匙圈 keyring），**不會上傳到任何地方**。
 完整聲明見 [PRIVACY.md](PRIVACY.md)。
 
 ## 設定檔（config.ini）
@@ -95,10 +105,13 @@ irm https://raw.githubusercontent.com/kyle2207/buysg-installer/main/install.ps1 
 └── bin\buysg.cmd
 ```
 
+> **macOS / Linux** 對應位置：`~/.local/share/buysg/`（`home/` 一樣放你的資料、更新不動；`buysg`
+> 指令在 `~/.local/bin/buysg`）。憑證放 `~/.local/share/buysg/home/certificates/<esun|fubon>/<名稱>/`，結構與上方相同。
+
 ## 疑難排解
 
 - 任何問題先跑 `buysg doctor`，它會逐項標出缺什麼、該放哪
-- 新開的視窗找不到 `buysg` 指令 → 重開一個 PowerShell 視窗
+- 新開的視窗找不到 `buysg` 指令 → 重開一個終端機視窗（Windows：PowerShell；macOS / Linux：Terminal，或先 `source ~/.zshrc`）
 - 想砍掉重來：`buysg uninstall` 後重跑安裝一行（憑證記得先備份）
 
 ---
