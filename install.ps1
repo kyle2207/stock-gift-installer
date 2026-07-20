@@ -201,7 +201,11 @@ popd
 exit /b %EC%
 
 :update
-echo Re-running installer to fetch the latest release...
+"%ROOT%\venv\Scripts\buysg.exe" check-update
+if errorlevel 1 goto :doupdate
+exit /b 0
+:doupdate
+echo Updating buysg to the latest release...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/kyle2207/buysg-installer/main/install.ps1 | iex"
 exit /b %ERRORLEVEL%
 
@@ -252,7 +256,8 @@ Write-Host "    buysg balance    # account balance + upcoming settlements"
 Write-Host "    buysg cancel     # cancel pending orders (pick by stock code)"
 Write-Host "    buysg accounts   # set default accounts"
 Write-Host "    buysg doctor     # health check"
-Write-Host "    buysg update     # update to latest release"
+Write-Host "    buysg version    # show version / check for updates"
+Write-Host "    buysg update     # update (only if a newer release exists)"
 Write-Host "    buysg uninstall  # remove everything"
 Write-Host "    buysg help       # full command list"
 Write-Host ""

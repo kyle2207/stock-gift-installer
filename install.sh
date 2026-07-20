@@ -203,7 +203,10 @@ ROOT="${ROOT}"
 export BUYSG_HOME="\$ROOT/home"
 case "\${1:-}" in
   update)
-    echo "Re-running installer to fetch the latest release..."
+    if "\$ROOT/venv/bin/buysg" check-update; then
+      exit 0
+    fi
+    echo "Updating buysg to the latest release..."
     curl -fsSL "${RAW_INSTALL}" | bash
     exit \$? ;;
   uninstall)
@@ -272,7 +275,8 @@ main() {
     info "buysg cancel     # cancel pending orders (pick by stock code)"
     info "buysg accounts   # set default accounts"
     info "buysg doctor     # health check"
-    info "buysg update     # update to latest release"
+    info "buysg version    # show version / check for updates"
+    info "buysg update     # update (only if a newer release exists)"
     info "buysg uninstall  # remove everything"
     info "buysg help       # full command list"
     echo
